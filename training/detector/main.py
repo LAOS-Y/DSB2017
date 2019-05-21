@@ -199,7 +199,7 @@ def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir)
         target = target.cuda()
         coord = coord.cuda()
 
-        print(data.shape, target.shape, coord.shape)
+        #print(data.shape, target.shape, coord.shape)
 
         output = net(data, coord)
         loss_output = loss(output, target)
