@@ -54,11 +54,9 @@ parser.add_argument('--n_test', default=8, type=int, metavar='N',
 
 def main():
     import data
-    print(data)
-
+    
     global args
     args = parser.parse_args()
-    
     
     torch.manual_seed(0)
     torch.cuda.set_device(0)
@@ -169,15 +167,15 @@ def main():
             lr = 0.01 * args.lr
         return lr
    
-    print("start test trn_dl")
+    #print("start test trn_dl")
 
-    from tqdm import tqdm
-    for idx, (data, target, coord) in tqdm(enumerate(train_loader), total=len(train_loader)):
-        print("#{}: {} {} {})".format(idx, data, target, coord))
+    #from tqdm import tqdm
+    #for idx, (data, target, coord) in tqdm(enumerate(train_loader), total=len(train_loader)):
+    #    print("#{}: {} {} {})".format(idx, data.shape, target.shape, coord.shape))
 
-    print("done")
+    #print("done")
 
-    assert False, "Yeah"
+    #assert False, "Yeah"
 
     for epoch in range(start_epoch, args.epochs + 1):
         train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
@@ -372,5 +370,4 @@ def singletest(data,net,config,splitfun,combinefun,n_per_run,margin = 64,isfeat=
     else:
         return output
 if __name__ == '__main__':
-    print(data)
     main()
