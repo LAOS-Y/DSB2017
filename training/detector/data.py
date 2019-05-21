@@ -20,21 +20,26 @@ class DataBowl3Detector(Dataset):
         sizelim2 = config['sizelim2']/config['reso']
         sizelim3 = config['sizelim3']/config['reso']
         self.blacklist = config['blacklist']
+
         self.isScale = config['aug_scale']
         self.r_rand = config['r_rand_crop']
         self.augtype = config['augtype']
-        self.pad_value = config['pad_value']
+        self.pad_value = int(config['pad_value'])
         self.split_comber = split_comber
-        idcs = np.load(split_path)
-        if phase!='test':
-            idcs = [f for f in idcs if (f not in self.blacklist)]
+        #idcs = np.load(split_path)
+        #if phase!='test':
+        #   idcs = [f.decode("utf-8") for f in idcs if (f not in self.blacklist)]
+
+        from glob import glob
+        idcs = sorted(glob(os.path.join(data_dir, '*_clean.npy')))
+        idcs = [i[:-10] for i in idcs]
 
         self.filenames = [os.path.join(data_dir, '%s_clean.npy' % idx) for idx in idcs]
         self.kagglenames = [f for f in self.filenames if len(f.split('/')[-1].split('_')[0])>20]
         self.lunanames = [f for f in self.filenames if len(f.split('/')[-1].split('_')[0])<20]
         
         labels = []
-        
+
         for idx in idcs:
             l = np.load(os.path.join(data_dir, '%s_label.npy' %idx))
             if np.all(l==0):
@@ -120,7 +125,7 @@ class DataBowl3Detector(Dataset):
 
     def __len__(self):
         if self.phase == 'train':
-            return len(self.bboxes)/(1-self.r_rand)
+            return int(len(self.bboxes)/(1-self.r_rand))
         elif self.phase =='val':
             return len(self.bboxes)
         else:
@@ -170,9 +175,16 @@ def augment(sample, target, bboxes, coord, ifflip = True, ifrotate=True, ifswap 
 
 class Crop(object):
     def __init__(self, config):
-        self.crop_size = config['crop_size']
-        self.bound_size = config['bound_size']
-        self.stride = config['stride']
+        #print(config["crop_size"])
+        
+        self.crop_size = [int(i) for i in config['crop_size']]
+
+        #print(self.crop_size)
+
+        self.bound_size = int(config['bound_size'])
+        self.stride = int(config['stride'])
+
+
         self.pad_value = config['pad_value']
     def __call__(self, imgs, target, bboxes,isScale=False,isRand=False):
         if isScale:
@@ -211,16 +223,57 @@ class Crop(object):
                            np.linspace(normstart[2],normstart[2]+normsize[2],self.crop_size[2]/self.stride),indexing ='ij')
         coord = np.concatenate([xx[np.newaxis,...], yy[np.newaxis,...],zz[np.newaxis,:]],0).astype('float32')
 
+        #print(crop_size)
+
+        #assert all([type(i) is int for i in crop_size]), "crop_size TypeError" + str(crop_size) + str([type(i) for i in crop_size])
+
+        assert all([type(i) is int for i in start]), "start TypeError" + str(start) + str([type(i) for i in start])
+
+
+        assert all([type(i) is int for i in imgs.shape]), "imgs.shape TypeError"
         pad = []
         pad.append([0,0])
         for i in range(3):
             leftpad = max(0,-start[i])
             rightpad = max(0,start[i]+crop_size[i]-imgs.shape[i+1])
             pad.append([leftpad,rightpad])
-        crop = imgs[:,
-            max(start[0],0):min(start[0] + crop_size[0],imgs.shape[1]),
-            max(start[1],0):min(start[1] + crop_size[1],imgs.shape[2]),
-            max(start[2],0):min(start[2] + crop_size[2],imgs.shape[3])]
+
+        #print("imgs.shape: {}".format(imgs.shape))
+        #print("len(start): {}".format(len(start)))
+        #print("len(crop_size): {}".format(len(crop_size)))
+
+        try:
+            crop = imgs[:,
+                max(start[0],0):min(start[0] + crop_size[0],imgs.shape[1]),
+                max(start[1],0):min(start[1] + crop_size[1],imgs.shape[2]),
+                max(start[2],0):min(start[2] + crop_size[2],imgs.shape[3])]
+        except TypeError:
+            print("imgs.shape: {}".format(imgs.shape))
+            print("len(start): {}".format(len(start)))
+            print("len(crop_size): {}".format(len(crop_size)))
+
+            try:
+                print(max(start[0], 0), min(start[0] + crop_size[0], imgs.shape[1]))
+                #crop = imgs[:, max(start[0],0):min(start[0] + crop_size[0],imgs.shape[1]), :, :]
+            except TypeError:
+                print("wrong at idx 0")
+
+            try:
+                print(max(start[1], 0), min(start[1] + crop_size[1], imgs.shape[2]))
+                #crop = imgs[:, :, max(start[1],0):min(start[1] + crop_size[1],imgs.shape[2]), :]
+            except TypeError:
+                print("wrong at idx 1")
+
+            try:
+                print(max(start[2], 0), min(start[2] + crop_size[2], imgs.shape[3]))
+                #crop = imgs[:, :, :, max(start[2],0):min(start[2] + crop_size[2],imgs.shape[3])]
+            except TypeError:
+                print("wrong at idx 2")
+            
+            #import ipdb
+            #ipdb.set_trace()
+            raise
+
         crop = np.pad(crop,pad,'constant',constant_values =self.pad_value)
         for i in range(3):
             target[i] = target[i] - start[i] 
@@ -267,9 +320,16 @@ class LabelMapping(object):
         
         output_size = []
         for i in range(3):
-            assert(input_size[i] % stride == 0)
-            output_size.append(input_size[i] / stride)
+            #assert(input_size[i] % stride == 0)
+            output_size.append(input_size[i] // stride)
+            #output_size.append(input_size[i] / stride)
         
+        #import ipdb
+        #ipdb.set_trace()
+
+        #print(output_size, type(output_size))
+        #print(len(anchors))
+
         label = -1 * np.ones(output_size + [len(anchors), 5], np.float32)
         offset = ((stride.astype('float')) - 1) / 2
         oz = np.arange(offset, offset + stride * (output_size[0] - 1) + 1, stride)

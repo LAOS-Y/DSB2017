@@ -2,3 +2,7 @@
 *.ipynb*
 training/.flag*
 prediction*.csv
+/**/*.txt
+/**/*.swp
+/**/*.png
+/**/*.ipynb

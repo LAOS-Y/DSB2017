@@ -1,16 +1,32 @@
 import numpy as np # linear algebra
 import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
-import dicom
+import pydicom
 import os
 import scipy.ndimage
 import matplotlib.pyplot as plt
 
 from skimage import measure, morphology
 
+import SimpleITK as sitk
+from glob import glob
+import os.path as P
 
+def load_mhd(filename):
+    # Reads the image using SimpleITK
+    itkimage = sitk.ReadImage(filename)
+
+    # Convert the image to a  numpy array first and then shuffle the dimensions to get axis in the order z,y,x
+    ct_scan = sitk.GetArrayFromImage(itkimage)
+    # Read the origin of the ct_scan, will be used to convert the coordinates from world to voxel and vice versa.
+    origin = np.array(list(reversed(itkimage.GetOrigin())))
+    # Read the spacing along each dimension
+    spacing = np.array(list(reversed(itkimage.GetSpacing())))
+
+    return ct_scan, spacing
 
 def load_scan(path):
-    slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
+    
+    slices = [pydicom.read_file(path + '/' + s) for s in os.listdir(path)]
     slices.sort(key = lambda x: float(x.ImagePositionPatient[2]))
     if slices[0].ImagePositionPatient[2] == slices[1].ImagePositionPatient[2]:
         sec_num = 2;
@@ -47,7 +63,7 @@ def get_pixels_hu(slices):
             
         image[slice_number] += np.int16(intercept)
     
-    return np.array(image, dtype=np.int16), np.array([slices[0].SliceThickness] + slices[0].PixelSpacing, dtype=np.float32)
+    return np.array(image, dtype=np.int16), np.array([slices[0].SliceThickness] + list(slices[0].PixelSpacing), dtype=np.float32)
 
 def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, eccen_th=0.99, bg_patch_size=10):
     bw = np.zeros(image.shape, dtype=bool)
@@ -150,9 +166,6 @@ def fill_hole(bw):
     
     return bw
 
-
-
-
 def two_lung_only(bw, spacing, max_iter=22, max_ratio=4.8):    
     def extract_main(bw, cover=0.95):
         for i in range(bw.shape[0]):
@@ -226,8 +239,11 @@ def two_lung_only(bw, spacing, max_iter=22, max_ratio=4.8):
     return bw1, bw2, bw
 
 def step1_python(case_path):
-    case = load_scan(case_path)
-    case_pixels, spacing = get_pixels_hu(case)
+    if case_path[-4:] == ".mhd":
+        case_pixels, spacing = load_mhd(case_path)
+    else:
+        case = load_scan(case_path)
+        case_pixels, spacing = get_pixels_hu(case)
     bw = binarize_per_slice(case_pixels, spacing)
     flag = 0
     cut_num = 0

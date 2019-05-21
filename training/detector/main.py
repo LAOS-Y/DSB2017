@@ -53,6 +53,9 @@ parser.add_argument('--n_test', default=8, type=int, metavar='N',
                     help='number of gpu for test')
 
 def main():
+    import data
+    print(data)
+
     global args
     args = parser.parse_args()
     
@@ -128,6 +131,10 @@ def main():
         'kaggleluna_full.npy',
         config,
         phase = 'train')
+
+    print(type(args.workers))
+    print(args.workers)
+
     train_loader = DataLoader(
         dataset,
         batch_size = args.batch_size,
@@ -161,7 +168,16 @@ def main():
         else:
             lr = 0.01 * args.lr
         return lr
-    
+   
+    print("start test trn_dl")
+
+    from tqdm import tqdm
+    for idx, (data, target, coord) in tqdm(enumerate(train_loader), total=len(train_loader)):
+        print("#{}: {} {} {})".format(idx, data, target, coord))
+
+    print("done")
+
+    assert False, "Yeah"
 
     for epoch in range(start_epoch, args.epochs + 1):
         train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
@@ -177,9 +193,15 @@ def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir)
 
     metrics = []
     for i, (data, target, coord) in enumerate(data_loader):
-        data = Variable(data.cuda(async = True))
-        target = Variable(target.cuda(async = True))
-        coord = Variable(coord.cuda(async = True))
+#         data = Variable(data.cuda(async = True))
+#         target = Variable(target.cuda(async = True))
+#         coord = Variable(coord.cuda(async = True))
+
+        data = data.cuda()
+        target = target.cuda()
+        coord = coord.cuda()
+
+        print(data.shape, target.shape, coord.shape)
 
         output = net(data, coord)
         loss_output = loss(output, target)
@@ -187,7 +209,7 @@ def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir)
         loss_output[0].backward()
         optimizer.step()
 
-        loss_output[0] = loss_output[0].data[0]
+        loss_output[0] = loss_output[0].data
         metrics.append(loss_output)
 
     if epoch % args.save_freq == 0:            
@@ -228,9 +250,13 @@ def validate(data_loader, net, loss):
 
     metrics = []
     for i, (data, target, coord) in enumerate(data_loader):
-        data = Variable(data.cuda(async = True), volatile = True)
-        target = Variable(target.cuda(async = True), volatile = True)
-        coord = Variable(coord.cuda(async = True), volatile = True)
+#         data = Variable(data.cuda(async = True), volatile = True)
+#         target = Variable(target.cuda(async = True), volatile = True)
+#         coord = Variable(coord.cuda(async = True), volatile = True)
+
+        data = data.cuda()
+        target = target.cuda()
+        coord = coord.cuda()
 
         output = net(data, coord)
         loss_output = loss(output, target, train = False)
@@ -323,7 +349,8 @@ def singletest(data,net,config,splitfun,combinefun,n_per_run,margin = 64,isfeat=
     z, h, w = data.size(2), data.size(3), data.size(4)
     print(data.size())
     data = splitfun(data,config['max_stride'],margin)
-    data = Variable(data.cuda(async = True), volatile = True,requires_grad=False)
+#     data = Variable(data.cuda(async = True), volatile = True,requires_grad=False)
+    data = Variable(data.cuda(), volatile = True,requires_grad=False)
     splitlist = range(0,args.split+1,n_per_run)
     outputlist = []
     featurelist = []
@@ -345,5 +372,5 @@ def singletest(data,net,config,splitfun,combinefun,n_per_run,margin = 64,isfeat=
     else:
         return output
 if __name__ == '__main__':
+    print(data)
     main()
-

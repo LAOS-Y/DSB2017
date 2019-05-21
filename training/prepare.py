@@ -115,7 +115,7 @@ def savenpy(id,annos,filelist,data_path,prep_folder):
     dm2 = process_mask(m2)
     dilatedMask = dm1+dm2
     Mask = m1+m2
-    extramask = dilatedMask - Mask
+    extramask = dilatedMask ^ Mask
     bone_thresh = 210
     pad_value = 170
     im[np.isnan(im)]=-2000
@@ -266,8 +266,9 @@ def preprocess_luna():
     luna_data = config['luna_data']
     luna_label = config['luna_label']
     finished_flag = '.flag_preprocessluna'
-    print('starting preprocessing luna')
+    
     if not os.path.exists(finished_flag):
+        print('starting preprocessing luna')
         filelist = [f.split('.mhd')[0] for f in os.listdir(luna_data) if f.endswith('.mhd') ]
         annos = np.array(pandas.read_csv(luna_label))
 
@@ -284,11 +285,13 @@ def preprocess_luna():
         _=pool.map(partial_savenpy_luna,range(N))
         pool.close()
         pool.join()
-    print('end preprocessing luna')
+        print('end preprocessing luna')
+    else:
+        print("detected" + finished_flag)
+    
     f= open(finished_flag,"w+")
     
 def prepare_luna():
-    print('start changing luna name')
     luna_raw = config['luna_raw']
     luna_abbr = config['luna_abbr']
     luna_data = config['luna_data']
@@ -296,7 +299,7 @@ def prepare_luna():
     finished_flag = '.flag_prepareluna'
     
     if not os.path.exists(finished_flag):
-
+        print('start changing luna name')
         subsetdirs = [os.path.join(luna_raw,f) for f in os.listdir(luna_raw) if f.startswith('subset') and os.path.isdir(os.path.join(luna_raw,f))]
         if not os.path.exists(luna_data):
             os.mkdir(luna_data)
@@ -318,6 +321,9 @@ def prepare_luna():
         namelist = list(abbrevs[:,1])
         ids = abbrevs[:,0]
         
+        if len(subsetdirs) != 0:
+            print("prepare luna -- subsets")
+        
         for d in subsetdirs:
             files = os.listdir(d)
             files.sort()
@@ -329,6 +335,10 @@ def prepare_luna():
                 print(os.path.join(luna_data,str(id)+f[-4:]))
 
         files = [f for f in os.listdir(luna_data) if f.endswith('mhd')]
+        
+        if len(files) != 0:
+            print("prepare luna -- files")
+        
         for file in files:
             with open(os.path.join(luna_data,file),'r') as f:
                 content = f.readlines()
@@ -367,7 +377,10 @@ def prepare_luna():
                 print(content[-1])
             with open(os.path.join(luna_segment,file),'w') as f:
                 f.writelines(content)
-    print('end changing luna name')
+        print('end changing luna name')
+    else:
+        print("detected" + finished_flag)
+    
     f= open(finished_flag,"w+")
     
 if __name__=='__main__':

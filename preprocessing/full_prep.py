@@ -9,7 +9,7 @@ from scipy.ndimage.morphology import binary_dilation,generate_binary_structure
 from skimage.morphology import convex_hull_image
 from multiprocessing import Pool
 from functools import partial
-from step1 import step1_python
+from .step1 import step1_python
 import warnings
 
 def process_mask(mask):
