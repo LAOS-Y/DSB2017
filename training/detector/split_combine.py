@@ -5,8 +5,8 @@ class SplitComb():
         self.side_len = side_len
         self.max_stride = max_stride
         self.stride = stride
-        self.margin = margin
-        self.pad_value = pad_value
+        self.margin = int(margin)
+        self.pad_value = int(pad_value)
         
     def split(self, data, side_len = None, max_stride = None, margin = None):
         if side_len==None:
@@ -30,10 +30,14 @@ class SplitComb():
         nzhw = [nz,nh,nw]
         self.nzhw = nzhw
         
+        margin = int(margin)
+        side_len = int(side_len)
+
         pad = [ [0, 0],
                 [margin, nz * side_len - z + margin],
                 [margin, nh * side_len - h + margin],
                 [margin, nw * side_len - w + margin]]
+
         data = np.pad(data, pad, 'edge')
 
         for iz in range(nz):
@@ -54,13 +58,13 @@ class SplitComb():
 
     def combine(self, output, nzhw = None, side_len=None, stride=None, margin=None):
         
-        if side_len==None:
+        if side_len is None:
             side_len = self.side_len
-        if stride == None:
+        if stride is None:
             stride = self.stride
-        if margin == None:
+        if margin is None:
             margin = self.margin
-        if nzhw==None:
+        if nzhw is None:
             nz = self.nz
             nh = self.nh
             nw = self.nw

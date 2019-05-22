@@ -15,7 +15,7 @@ from torch.nn import DataParallel
 from torch.backends import cudnn
 from torch.utils.data import DataLoader
 from torch import optim
-from torch.autograd import Variable
+#from torch.autograd import Variable
 from config_training import config as config_training
 
 from layers import acc
@@ -83,7 +83,7 @@ def main():
             save_dir = os.path.join('results', args.model + '-' + exp_id)
         else:
             save_dir = os.path.join('results',save_dir)
-    
+
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     logfile = os.path.join(save_dir,'log')
@@ -248,18 +248,19 @@ def validate(data_loader, net, loss):
 
     metrics = []
     for i, (data, target, coord) in enumerate(data_loader):
+        with torch.no_grad():
 #         data = Variable(data.cuda(async = True), volatile = True)
 #         target = Variable(target.cuda(async = True), volatile = True)
 #         coord = Variable(coord.cuda(async = True), volatile = True)
 
-        data = data.cuda()
-        target = target.cuda()
-        coord = coord.cuda()
+            data = data.cuda()
+            target = target.cuda()
+            coord = coord.cuda()
 
-        output = net(data, coord)
-        loss_output = loss(output, target, train = False)
-
-        loss_output[0] = loss_output[0].data[0]
+            output = net(data, coord)
+            loss_output = loss(output, target, train = False)
+            #print(loss_output)
+            loss_output[0] = loss_output[0].data
         metrics.append(loss_output)    
     end_time = time.time()
 
@@ -303,21 +304,23 @@ def test(data_loader, net, get_pbb, save_dir, config):
                 isfeat = True
         n_per_run = args.n_test
         print(data.size())
-        splitlist = range(0,len(data)+1,n_per_run)
+        splitlist = list(range(0,len(data)+1,n_per_run))
         if splitlist[-1]!=len(data):
             splitlist.append(len(data))
         outputlist = []
         featurelist = []
 
         for i in range(len(splitlist)-1):
-            input = Variable(data[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
-            inputcoord = Variable(coord[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
-            if isfeat:
-                output,feature = net(input,inputcoord)
-                featurelist.append(feature.data.cpu().numpy())
-            else:
-                output = net(input,inputcoord)
-            outputlist.append(output.data.cpu().numpy())
+            with torch.no_grad():
+                input = data[splitlist[i]:splitlist[i+1]].cuda()
+                inputcoord = coord[splitlist[i]:splitlist[i+1]].cuda()
+                if isfeat:
+                    output,feature = net(input,inputcoord)
+                    featurelist.append(feature.data.cpu().numpy())
+                else:
+                    output = net(input,inputcoord)
+                    outputlist.append(output.data.cpu().numpy())
+        
         output = np.concatenate(outputlist,0)
         output = split_comber.combine(output,nzhw=nzhw)
         if isfeat:
@@ -344,30 +347,31 @@ def test(data_loader, net, get_pbb, save_dir, config):
     print
 
 def singletest(data,net,config,splitfun,combinefun,n_per_run,margin = 64,isfeat=False):
-    z, h, w = data.size(2), data.size(3), data.size(4)
-    print(data.size())
-    data = splitfun(data,config['max_stride'],margin)
-#     data = Variable(data.cuda(async = True), volatile = True,requires_grad=False)
-    data = Variable(data.cuda(), volatile = True,requires_grad=False)
-    splitlist = range(0,args.split+1,n_per_run)
-    outputlist = []
-    featurelist = []
-    for i in range(len(splitlist)-1):
+    with torch.no_grad():
+        z, h, w = data.size(2), data.size(3), data.size(4)
+        print(data.size())
+        data = splitfun(data,config['max_stride'],margin)
+    #     data = Variable(data.cuda(async = True), volatile = True,requires_grad=False)
+        data = data.cuda()
+        splitlist = range(0,args.split+1,n_per_run)
+        outputlist = []
+        featurelist = []
+        for i in range(len(splitlist)-1):
+            if isfeat:
+                output,feature = net(data[splitlist[i]:splitlist[i+1]])
+                featurelist.append(feature)
+            else:
+                output = net(data[splitlist[i]:splitlist[i+1]])
+            output = output.data.cpu().numpy()
+            outputlist.append(output)
+            
+        output = np.concatenate(outputlist,0)
+        output = combinefun(output, z / config['stride'], h / config['stride'], w / config['stride'])
         if isfeat:
-            output,feature = net(data[splitlist[i]:splitlist[i+1]])
-            featurelist.append(feature)
+            feature = np.concatenate(featurelist,0).transpose([0,2,3,4,1])
+            feature = combinefun(feature, z / config['stride'], h / config['stride'], w / config['stride'])
+            return output,feature
         else:
-            output = net(data[splitlist[i]:splitlist[i+1]])
-        output = output.data.cpu().numpy()
-        outputlist.append(output)
-        
-    output = np.concatenate(outputlist,0)
-    output = combinefun(output, z / config['stride'], h / config['stride'], w / config['stride'])
-    if isfeat:
-        feature = np.concatenate(featurelist,0).transpose([0,2,3,4,1])
-        feature = combinefun(feature, z / config['stride'], h / config['stride'], w / config['stride'])
-        return output,feature
-    else:
-        return output
+            return output
 if __name__ == '__main__':
     main()
