@@ -130,9 +130,6 @@ def main():
         config,
         phase = 'train')
 
-    print(type(args.workers))
-    print(args.workers)
-
     train_loader = DataLoader(
         dataset,
         batch_size = args.batch_size,
@@ -166,16 +163,6 @@ def main():
         else:
             lr = 0.01 * args.lr
         return lr
-   
-    #print("start test trn_dl")
-
-    #from tqdm import tqdm
-    #for idx, (data, target, coord) in tqdm(enumerate(train_loader), total=len(train_loader)):
-    #    print("#{}: {} {} {})".format(idx, data.shape, target.shape, coord.shape))
-
-    #print("done")
-
-    #assert False, "Yeah"
 
     for epoch in range(start_epoch, args.epochs + 1):
         train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
@@ -247,6 +234,8 @@ def validate(data_loader, net, loss):
     net.eval()
 
     metrics = []
+
+
     for i, (data, target, coord) in enumerate(data_loader):
         with torch.no_grad():
 #         data = Variable(data.cuda(async = True), volatile = True)
@@ -290,6 +279,15 @@ def test(data_loader, net, get_pbb, save_dir, config):
     net.eval()
     namelist = []
     split_comber = data_loader.dataset.split_comber
+    
+    #print("start checking test_dl")
+    #from tqdm import tqdm
+    #for i, _ in tqdm(enumerate(data_loader), total=len(data_loader)):
+    #    pass
+
+    #print("done checking test_dl")
+    #assert False, "Yeah"
+
     for i_name, (data, target, coord, nzhw) in enumerate(data_loader):
         s = time.time()
         target = [np.asarray(t, np.float32) for t in target]
