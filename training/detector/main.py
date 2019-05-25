@@ -20,6 +20,9 @@ from config_training import config as config_training
 
 from layers import acc
 
+#from absl import logging
+#print = logging.info
+
 parser = argparse.ArgumentParser(description='PyTorch DataBowl3 Detector')
 parser.add_argument('--model', '-m', metavar='MODEL', default='base',
                     help='model')
@@ -167,6 +170,7 @@ def main():
     for epoch in range(start_epoch, args.epochs + 1):
         train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
         validate(val_loader, net, loss)
+        print('-----------------------------------------')
 
 def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir):
     start_time = time.time()
@@ -226,7 +230,8 @@ def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir)
         np.mean(metrics[:, 3]),
         np.mean(metrics[:, 4]),
         np.mean(metrics[:, 5])))
-    print
+    import sys
+    sys.stdout.flush()
 
 def validate(data_loader, net, loss):
     start_time = time.time()
@@ -251,6 +256,7 @@ def validate(data_loader, net, loss):
             #print(loss_output)
             loss_output[0] = loss_output[0].data
         metrics.append(loss_output)    
+        #print('iter#', i)
     end_time = time.time()
 
     metrics = np.asarray(metrics, np.float32)
@@ -279,16 +285,11 @@ def test(data_loader, net, get_pbb, save_dir, config):
     net.eval()
     namelist = []
     split_comber = data_loader.dataset.split_comber
-    
-    #print("start checking test_dl")
-    #from tqdm import tqdm
-    #for i, _ in tqdm(enumerate(data_loader), total=len(data_loader)):
-    #    pass
 
-    #print("done checking test_dl")
-    #assert False, "Yeah"
+    print(len(data_loader))
 
-    for i_name, (data, target, coord, nzhw) in enumerate(data_loader):
+    from tqdm import tqdm
+    for i_name, (data, target, coord, nzhw) in tqdm(enumerate(data_loader), total=len(data_loader)):
         s = time.time()
         target = [np.asarray(t, np.float32) for t in target]
         lbb = target[0]
@@ -296,12 +297,18 @@ def test(data_loader, net, get_pbb, save_dir, config):
         name = data_loader.dataset.filenames[i_name].split('-')[0].split('/')[-1].split('_clean')[0]
         data = data[0][0]
         coord = coord[0][0]
+        
+        #print("===========================================")
+        #print("data shape", data.shape)
+        #print("coord shape", coord.shape)
+        #print("nzhw shape", nzhw.shape)
+
         isfeat = False
         if 'output_feature' in config:
             if config['output_feature']:
                 isfeat = True
         n_per_run = args.n_test
-        print(data.size())
+
         splitlist = list(range(0,len(data)+1,n_per_run))
         if splitlist[-1]!=len(data):
             splitlist.append(len(data))
@@ -309,9 +316,14 @@ def test(data_loader, net, get_pbb, save_dir, config):
         featurelist = []
 
         for i in range(len(splitlist)-1):
+            #print("--------------------------------")
             with torch.no_grad():
                 input = data[splitlist[i]:splitlist[i+1]].cuda()
                 inputcoord = coord[splitlist[i]:splitlist[i+1]].cuda()
+                
+                #print("input.shape", input.shape)
+                #print("inputcoord.shape", inputcoord.shape)
+
                 if isfeat:
                     output,feature = net(input,inputcoord)
                     featurelist.append(feature.data.cpu().numpy())
@@ -332,7 +344,7 @@ def test(data_loader, net, get_pbb, save_dir, config):
             np.save(os.path.join(save_dir, name+'_feature.npy'), feature_selected)
         #tp,fp,fn,_ = acc(pbb,lbb,0,0.1,0.1)
         #print([len(tp),len(fp),len(fn)])
-        print([i_name,name])
+        #print([i_name,name])
         e = time.time()
         np.save(os.path.join(save_dir, name+'_pbb.npy'), pbb)
         np.save(os.path.join(save_dir, name+'_lbb.npy'), lbb)
@@ -347,7 +359,6 @@ def test(data_loader, net, get_pbb, save_dir, config):
 def singletest(data,net,config,splitfun,combinefun,n_per_run,margin = 64,isfeat=False):
     with torch.no_grad():
         z, h, w = data.size(2), data.size(3), data.size(4)
-        print(data.size())
         data = splitfun(data,config['max_stride'],margin)
     #     data = Variable(data.cuda(async = True), volatile = True,requires_grad=False)
         data = data.cuda()

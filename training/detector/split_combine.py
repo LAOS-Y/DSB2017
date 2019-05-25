@@ -72,8 +72,8 @@ class SplitComb():
             nz,nh,nw = nzhw
         assert(side_len % stride == 0)
         assert(margin % stride == 0)
-        side_len /= stride
-        margin /= stride
+        side_len //= stride
+        margin //= stride
 
         splits = []
         for i in range(len(output)):

@@ -6,3 +6,4 @@ prediction*.csv
 /**/*.swp
 /**/*.png
 /**/*.ipynb
+/**/*.ckpt
