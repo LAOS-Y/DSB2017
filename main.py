@@ -24,11 +24,16 @@ skip_prep = config_submit['skip_preprocessing']
 skip_detect = config_submit['skip_detect']
 
 if not skip_prep:
+    print("start preprocessing")
     testsplit = full_prep(datapath,prep_result_path,
                           n_worker = config_submit['n_worker_preprocessing'],
                           use_existing=config_submit['use_exsiting_preprocessing'])
+    print("finish preprocessing")
 else:
+    print("skip preprocessing")
     testsplit = os.listdir(datapath)
+
+print("start inference")
 
 nodmodel = import_module(config_submit['detector_model'].split('.py')[0])
 config1, nod_net, loss, get_pbb = nodmodel.get_model()

@@ -2,11 +2,11 @@ import torch
 import numpy as np
 class SplitComb():
     def __init__(self,side_len,max_stride,stride,margin,pad_value):
-        self.side_len = side_len
-        self.max_stride = max_stride
-        self.stride = stride
-        self.margin = margin
-        self.pad_value = pad_value
+        self.side_len = int(side_len)
+        self.max_stride = int(max_stride)
+        self.stride = int(stride)
+        self.margin = int(margin)
+        self.pad_value = int(pad_value)
         
     def split(self, data, side_len = None, max_stride = None, margin = None):
         if side_len==None:
@@ -68,8 +68,8 @@ class SplitComb():
             nz,nh,nw = nzhw
         assert(side_len % stride == 0)
         assert(margin % stride == 0)
-        side_len /= stride
-        margin /= stride
+        side_len //= stride
+        margin //= stride
 
         splits = []
         for i in range(len(output)):
