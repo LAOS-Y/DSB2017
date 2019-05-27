@@ -28,9 +28,13 @@ class DataBowl3Detector(Dataset):
         self.pad_value = config['pad_value']
         
         self.split_comber = split_comber
-        idcs = split
-        if phase!='test':
-            idcs = [f for f in idcs if f not in self.blacklist]
+        #idcs = split
+        #if phase!='test':
+        #    idcs = [f for f in idcs if f not in self.blacklist]
+
+        from glob import glob
+        idcs = sorted(glob(os.path.join(data_dir, '*_clean.npy')))
+        idcs = [i.split('/')[-1].split('_')[0] for i in idcs]
 
         self.channel = config['chanel']
         if self.channel==2:
@@ -44,13 +48,16 @@ class DataBowl3Detector(Dataset):
         self.lunanames = [f for f in self.filenames if len(f.split('/')[-1].split('_')[0])<20]
         
         labels = []
-        
+       
+        #from ipdb import set_trace
+        #set_trace()
+
         for idx in idcs:
             if config['luna_raw'] ==True:
                 try:
                     l = np.load(os.path.join(data_dir, '%s_label_raw.npy' % idx))
                 except:
-                    l = np.load(os.path.join(data_dir, '%s_label.npy' %idx))
+                    l = np.load(os.path.join(data_dir, '%s_label.npy' % idx))
             else:
                 l = np.load(os.path.join(data_dir, '%s_label.npy' %idx))
             labels.append(l)

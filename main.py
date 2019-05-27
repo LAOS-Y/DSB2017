@@ -33,7 +33,7 @@ else:
     print("skip preprocessing")
     testsplit = os.listdir(datapath)
 
-print("start build detector")
+print("start building detector")
 
 nodmodel = import_module(config_submit['detector_model'].split('.py')[0])
 config1, nod_net, loss, get_pbb = nodmodel.get_model()

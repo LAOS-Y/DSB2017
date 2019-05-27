@@ -2,8 +2,8 @@ import torch
 import numpy as np
 class SplitComb():
     def __init__(self,side_len,max_stride,stride,margin,pad_value):
-        self.side_len = int(side_len)
-        self.max_stride = int(max_stride)
+        self.side_len = side_len
+        self.max_stride = max_stride
         self.stride = int(stride)
         self.margin = int(margin)
         self.pad_value = int(pad_value)
@@ -30,10 +30,14 @@ class SplitComb():
         nzhw = [nz,nh,nw]
         self.nzhw = nzhw
         
+        margin = int(margin)
+        side_len = int(side_len)
+
         pad = [ [0, 0],
                 [margin, nz * side_len - z + margin],
                 [margin, nh * side_len - h + margin],
                 [margin, nw * side_len - w + margin]]
+
         data = np.pad(data, pad, 'edge')
 
         for iz in range(nz):
