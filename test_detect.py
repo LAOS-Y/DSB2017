@@ -21,7 +21,9 @@ def test_detect(data_loader, net, get_pbb, save_dir, config,n_gpu):
     start_time = time.time()
     net.eval()
     split_comber = data_loader.dataset.split_comber
-    for i_name, (data, target, coord, nzhw) in enumerate(data_loader):
+    from tqdm import tqdm
+    
+    for i_name, (data, target, coord, nzhw) in tqdm(enumerate(data_loader), total=len(data_loader)):
         s = time.time()
         target = [np.asarray(t, np.float32) for t in target]
         lbb = target[0]
@@ -35,14 +37,13 @@ def test_detect(data_loader, net, get_pbb, save_dir, config,n_gpu):
             if config['output_feature']:
                 isfeat = True
         #n_per_run = n_gpu
-        print(data.size())
+        #print(data.size())
         splitlist = list(range(0,len(data)+1,n_gpu))
         if splitlist[-1]!=len(data):
             splitlist.append(len(data))
         outputlist = []
         featurelist = []
 
-        from tqdm import tqdm
 
         for i in tqdm(range(len(splitlist)-1)):
             with torch.no_grad():
@@ -57,7 +58,7 @@ def test_detect(data_loader, net, get_pbb, save_dir, config,n_gpu):
                     featurelist.append(feature.data.cpu().numpy())
                 else:
                     output = net(input,inputcoord)
-                outputlist.append(output.data.cpu().numpy())
+            outputlist.append(output.data.cpu().numpy())
 
         output = np.concatenate(outputlist,0)
         output = split_comber.combine(output,nzhw=nzhw)
@@ -72,7 +73,7 @@ def test_detect(data_loader, net, get_pbb, save_dir, config,n_gpu):
             np.save(os.path.join(save_dir, shortname+'_feature.npy'), feature_selected)
         #tp,fp,fn,_ = acc(pbb,lbb,0,0.1,0.1)
         #print([len(tp),len(fp),len(fn)])
-        print([i_name,shortname])
+        #print([i_name,shortname])
         e = time.time()
         
         np.save(os.path.join(save_dir, shortname+'_pbb.npy'), pbb)

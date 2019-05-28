@@ -100,12 +100,12 @@ class Net(nn.Module):
 
     def forward(self, x, coord):
         
-        import ipdb
-        ipdb.set_trace()
+        #import ipdb
+       #ipdb.set_trace()
 
         out = self.preBlock(x)#16
 
-        print("done preBLock")
+        #print("done preBLock")
 
         out_pool,indices0 = self.maxpool1(out)
         out1 = self.forw1(out_pool)#32
