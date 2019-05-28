@@ -42,7 +42,9 @@ def test_detect(data_loader, net, get_pbb, save_dir, config,n_gpu):
         outputlist = []
         featurelist = []
 
-        for i in range(len(splitlist)-1):
+        from tqdm import tqdm
+
+        for i in tqdm(range(len(splitlist)-1)):
             with torch.no_grad():
                 input = data[splitlist[i]:splitlist[i+1]].contiguous().cuda()
                 inputcoord = coord[splitlist[i]:splitlist[i+1]].contiguous().cuda()

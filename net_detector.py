@@ -99,10 +99,18 @@ class Net(nn.Module):
                                    nn.Conv3d(64, 5 * len(config['anchors']), kernel_size = 1))
 
     def forward(self, x, coord):
+        
+        import ipdb
+        ipdb.set_trace()
+
         out = self.preBlock(x)#16
+
+        print("done preBLock")
+
         out_pool,indices0 = self.maxpool1(out)
         out1 = self.forw1(out_pool)#32
         out1_pool,indices1 = self.maxpool2(out1)
+
         out2 = self.forw2(out1_pool)#64
         #out2 = self.drop(out2)
         out2_pool,indices2 = self.maxpool3(out2)

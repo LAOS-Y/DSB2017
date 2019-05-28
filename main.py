@@ -39,13 +39,15 @@ print("start building detector")
 
 nodmodel = import_module(config_submit['detector_model'].split('.py')[0])
 config1, nod_net, loss, get_pbb = nodmodel.get_model()
-checkpoint = torch.load(config_submit['detector_param'])
-nod_net.load_state_dict(checkpoint['state_dict'])
+#checkpoint = torch.load(config_submit['detector_param'])
+#nod_net.load_state_dict(checkpoint['state_dict'])
+
+print("finish loading detector param")
 
 torch.cuda.set_device(0)
 nod_net = nod_net.cuda()
 #cudnn.benchmark = True
-nod_net = DataParallel(nod_net)
+#nod_net = DataParallel(nod_net)
 #nod_net = nod_net.cuda()
 
 bbox_result_path = './bbox_result'
