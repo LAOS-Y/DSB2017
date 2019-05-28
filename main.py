@@ -2,6 +2,8 @@ from preprocessing import full_prep
 from config_submit import config as config_submit
 
 import torch
+torch.backends.cudnn.enabled = False
+
 from torch.nn import DataParallel
 from torch.backends import cudnn
 from torch.utils.data import DataLoader
@@ -42,8 +44,9 @@ nod_net.load_state_dict(checkpoint['state_dict'])
 
 torch.cuda.set_device(0)
 nod_net = nod_net.cuda()
-cudnn.benchmark = True
+#cudnn.benchmark = True
 nod_net = DataParallel(nod_net)
+#nod_net = nod_net.cuda()
 
 bbox_result_path = './bbox_result'
 if not os.path.exists(bbox_result_path):

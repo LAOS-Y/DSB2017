@@ -34,7 +34,7 @@ def test_detect(data_loader, net, get_pbb, save_dir, config,n_gpu):
         if 'output_feature' in config:
             if config['output_feature']:
                 isfeat = True
-        n_per_run = n_gpu
+        #n_per_run = n_gpu
         print(data.size())
         splitlist = list(range(0,len(data)+1,n_gpu))
         if splitlist[-1]!=len(data):
@@ -43,14 +43,20 @@ def test_detect(data_loader, net, get_pbb, save_dir, config,n_gpu):
         featurelist = []
 
         for i in range(len(splitlist)-1):
-            input = Variable(data[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
-            inputcoord = Variable(coord[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
-            if isfeat:
-                output,feature = net(input,inputcoord)
-                featurelist.append(feature.data.cpu().numpy())
-            else:
-                output = net(input,inputcoord)
-            outputlist.append(output.data.cpu().numpy())
+            with torch.no_grad():
+                input = data[splitlist[i]:splitlist[i+1]].contiguous().cuda()
+                inputcoord = coord[splitlist[i]:splitlist[i+1]].contiguous().cuda()
+
+                #import ipdb
+                #ipdb.set_trace()
+
+                if isfeat:
+                    output,feature = net(input,inputcoord)
+                    featurelist.append(feature.data.cpu().numpy())
+                else:
+                    output = net(input,inputcoord)
+                outputlist.append(output.data.cpu().numpy())
+
         output = np.concatenate(outputlist,0)
         output = split_comber.combine(output,nzhw=nzhw)
         if isfeat:

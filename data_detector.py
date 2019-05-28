@@ -117,7 +117,7 @@ class DataBowl3Detector(Dataset):
             #if filename in self.kagglenames:
         #       label[label==-1]=0
             sample = (sample.astype(np.float32)-128)/128
-            return torch.from_numpy(sample), torch.from_numpy(label), coord
+            return torch.from_numpy(sample).contiguous(), torch.from_numpy(label).contiguous(), coord.contiguous()
         else:
             imgs = np.load(self.filenames[idx])
             bboxes = self.sample_bboxes[idx]
@@ -137,7 +137,7 @@ class DataBowl3Detector(Dataset):
                                                    margin = self.split_comber.margin/self.stride)
             assert np.all(nzhw==nzhw2)
             imgs = (imgs.astype(np.float32)-128)/128
-            return torch.from_numpy(imgs.astype(np.float32)), bboxes, torch.from_numpy(coord2.astype(np.float32)), np.array(nzhw)
+            return torch.from_numpy(imgs.astype(np.float32)).contiguous(), bboxes, torch.from_numpy(coord2.astype(np.float32)).contiguous(), np.array(nzhw)
 
     def __len__(self):
         if self.phase == 'train':
