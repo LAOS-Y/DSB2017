@@ -85,8 +85,8 @@ print("start building casenet")
 casemodel = import_module(config_submit['classifier_model'].split('.py')[0])
 casenet = casemodel.CaseNet(topk=5)
 config2 = casemodel.config
-checkpoint = torch.load(config_submit['classifier_param'])
-casenet.load_state_dict(checkpoint['state_dict'])
+#checkpoint = torch.load(config_submit['classifier_param'])
+#`casenet.load_state_dict(checkpoint['state_dict'])
 
 print("finish loading casenet param")
 

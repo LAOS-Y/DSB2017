@@ -32,7 +32,13 @@ class DataBowl3Classifier(Dataset):
         self.candidate_box = []
         self.pbb_label = []
         
-        idcs = split
+        #idcs = split
+
+        data_dir = config["datadir"]
+        from glob import glob
+        idcs = sorted(glob(os.path.join(data_dir, '*_clean.npy')))
+        idcs = [i.split('/')[-1].split('_')[0] for i in idcs]
+
         self.filenames = [os.path.join(datadir, '%s_clean.npy' % idx.split('-')[0]) for idx in idcs]
         if self.phase!='test':
             self.yset = 1-np.array([f.split('-')[1][2] for f in idcs]).astype('int')
@@ -75,8 +81,12 @@ class DataBowl3Classifier(Dataset):
             #chosenid = conf_list.argsort()[::-1][:topk]
         else:
             chosenid = conf_list.argsort()[::-1][:topk]
+
+        #import ipdb
+        #ipdb.set_trace()
+
         croplist = np.zeros([topk,1,self.crop_size[0],self.crop_size[1],self.crop_size[2]]).astype('float32')
-        coordlist = np.zeros([topk,3,self.crop_size[0]/self.stride,self.crop_size[1]/self.stride,self.crop_size[2]/self.stride]).astype('float32')
+        coordlist = np.zeros([topk,3,self.crop_size[0] //self.stride,self.crop_size[1] // self.stride,self.crop_size[2] // self.stride]).astype('float32')
         padmask = np.concatenate([np.ones(len(chosenid)),np.zeros(self.topk-len(chosenid))])
         isnodlist = np.zeros([topk])
 
