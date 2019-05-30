@@ -10,4 +10,4 @@ config = {'datapath':'/home/ysw/ct_data/DSB3/stage2/',
          'n_worker_preprocessing':None,
          'use_exsiting_preprocessing':False,
          'skip_preprocessing':True,
-         'skip_detect':False}
+         'skip_detect':True}

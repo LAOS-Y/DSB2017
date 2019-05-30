@@ -78,13 +78,17 @@ else:
     print("skip detection")
 
 
-0/0
+#0/0
+
+print("start building casenet")
 
 casemodel = import_module(config_submit['classifier_model'].split('.py')[0])
 casenet = casemodel.CaseNet(topk=5)
 config2 = casemodel.config
 checkpoint = torch.load(config_submit['classifier_param'])
 casenet.load_state_dict(checkpoint['state_dict'])
+
+print("finish loading casenet param")
 
 torch.cuda.set_device(0)
 casenet = casenet.cuda()
@@ -96,6 +100,8 @@ filename = config_submit['outputfile']
 
 
 def test_casenet(model,testset):
+    print("start building dataloader for casenet")
+
     data_loader = DataLoader(
         testset,
         batch_size = 1,
@@ -108,20 +114,27 @@ def test_casenet(model,testset):
     
     #     weight = torch.from_numpy(np.ones_like(y).float().cuda()
     for i,(x,coord) in enumerate(data_loader):
+        with torch.no_grad():
+            coord = Variable(coord).cuda()
+            x = Variable(x).cuda()
+            nodulePred,casePred,_ = model(x,coord)
+            predlist.append(casePred.data.cpu().numpy())
+            #print([i,data_loader.dataset.split[i,1],casePred.data.cpu().numpy()])
 
-        coord = Variable(coord).cuda()
-        x = Variable(x).cuda()
-        nodulePred,casePred,_ = model(x,coord)
-        predlist.append(casePred.data.cpu().numpy())
-        #print([i,data_loader.dataset.split[i,1],casePred.data.cpu().numpy()])
     predlist = np.concatenate(predlist)
     return predlist    
+
 config2['bboxpath'] = bbox_result_path
 config2['datadir'] = prep_result_path
 
-
+print("start building dataset for casenet")
 
 dataset = DataBowl3Classifier(testsplit, config2, phase = 'test')
 predlist = test_casenet(casenet,dataset).T
+
+print("finisht casenet inference")
+
 df = pandas.DataFrame({'id':testsplit, 'cancer':predlist})
 df.to_csv(filename,index=False)
+
+print("csv saved as ", filename)
