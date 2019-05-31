@@ -33,7 +33,12 @@ if not skip_prep:
     print("finish preprocessing")
 else:
     print("skip preprocessing")
-    testsplit = os.listdir(datapath)
+    testsplit = os.listdir(prep_result_path)
+    testsplit = [i.split('_')[0] for i in testsplit if "clean.npy" in i]
+
+#print(testsplit)
+#print(len(testsplit))
+#0/0
 
 print("start building detector")
 
@@ -113,7 +118,9 @@ def test_casenet(model,testset):
     predlist = []
     
     #     weight = torch.from_numpy(np.ones_like(y).float().cuda()
-    for i,(x,coord) in enumerate(data_loader):
+
+    from tqdm import tqdm
+    for i,(x,coord) in tqdm(enumerate(data_loader), total=len(data_loader)):
         with torch.no_grad():
             coord = Variable(coord).cuda()
             x = Variable(x).cuda()
@@ -133,6 +140,9 @@ dataset = DataBowl3Classifier(testsplit, config2, phase = 'test')
 predlist = test_casenet(casenet,dataset).T
 
 print("finisht casenet inference")
+
+import ipdb
+ipdb.set_trace()
 
 df = pandas.DataFrame({'id':testsplit, 'cancer':predlist})
 df.to_csv(filename,index=False)
