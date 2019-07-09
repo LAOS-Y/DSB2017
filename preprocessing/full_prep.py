@@ -59,7 +59,7 @@ def resample(imgs, spacing, new_spacing,order = 2):
     else:
         raise ValueError('wrong shape')
 
-def savenpy(id,filelist,prep_folder,data_path,use_existing=True):      
+def savenpy(id,filelist,prep_folder,data_path,use_existing=True,isEGFR=False):      
     resolution = np.array([1,1,1])
     name = filelist[id]
     if use_existing:
@@ -67,7 +67,7 @@ def savenpy(id,filelist,prep_folder,data_path,use_existing=True):
             print(name+' had been done')
             return
     try:
-        im, m1, m2, spacing = step1_python(os.path.join(data_path,name))
+        im, m1, m2, spacing = step1_python(os.path.join(data_path,name), isEGFR)
         Mask = m1+m2
         
         newshape = np.round(np.array(Mask.shape)*spacing/resolution)
@@ -78,8 +78,6 @@ def savenpy(id,filelist,prep_folder,data_path,use_existing=True):
         margin = 5
         extendbox = np.vstack([np.max([[0,0,0],box[:,0]-margin],0),np.min([newshape,box[:,1]+2*margin],axis=0).T]).T
         extendbox = extendbox.astype('int')
-
-
 
         convex_mask = m1
         dm1 = process_mask(m1)
@@ -104,11 +102,13 @@ def savenpy(id,filelist,prep_folder,data_path,use_existing=True):
         np.save(os.path.join(prep_folder,name+'_label'),np.array([[0,0,0,0]]))
     except:
         print('bug in '+name)
+        with open("fail.txt", mode='w+'):
+            print(name)
         raise
     print(name+' done')
 
     
-def full_prep(data_path,prep_folder,n_worker = None,use_existing=True):
+def full_prep(data_path,prep_folder,n_worker = None,use_existing=True,isEGFR=False):
     warnings.filterwarnings("ignore")
     if not os.path.exists(prep_folder):
         os.mkdir(prep_folder)
@@ -118,11 +118,18 @@ def full_prep(data_path,prep_folder,n_worker = None,use_existing=True):
     pool = Pool(n_worker)
     filelist = [f for f in os.listdir(data_path)]
     partial_savenpy = partial(savenpy,filelist=filelist,prep_folder=prep_folder,
-                              data_path=data_path,use_existing=use_existing)
+                              data_path=data_path,use_existing=use_existing,
+                              isEGFR=isEGFR)
 
     N = len(filelist)
+    #N = 200
     _=pool.map(partial_savenpy,range(N))
     pool.close()
     pool.join()
+
+    #for i in range(N):
+    #    partial_savenpy(i)
+    #    print(i)
+    
     print('end preprocessing')
     return filelist

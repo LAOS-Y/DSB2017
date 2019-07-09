@@ -29,7 +29,8 @@ if not skip_prep:
     print("start preprocessing")
     testsplit = full_prep(datapath,prep_result_path,
                           n_worker = config_submit['n_worker_preprocessing'],
-                          use_existing=config_submit['use_exsiting_preprocessing'])
+                          use_existing=config_submit['use_exsiting_preprocessing'],
+                          isEGFR=config_submit['is_EGFR'])
     print("finish preprocessing")
 else:
     print("skip preprocessing")
@@ -38,7 +39,7 @@ else:
 
 #print(testsplit)
 #print(len(testsplit))
-#0/0
+0/0
 
 print("start building detector")
 

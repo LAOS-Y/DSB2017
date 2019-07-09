@@ -24,6 +24,35 @@ def load_mhd(filename):
 
     return ct_scan, spacing
 
+def load_egfr(path):
+    # Reads the image using SimpleITK
+    
+    filenames = sorted(glob(P.join(path, '*.dcm')))
+    
+    scans = []
+    spacings = []
+    
+    for filename in filenames:
+        dcm = pydicom.read_file(filename)
+        
+        itkimage = sitk.ReadImage(filename)
+
+        # Convert the image to a  numpy array first and then shuffle the dimensions to get axis in the order z,y,x
+        ct_scan = sitk.GetArrayFromImage(itkimage)
+        # Read the spacing along each dimension
+        spacing = np.array(list(reversed(itkimage.GetSpacing())))
+
+        spacing[0] = float(dcm.SliceThickness)
+        
+        scans.append(ct_scan)
+        spacings.append(tuple(spacing))
+
+    assert len(set(spacings)) == 1, 'spacings FUCK'
+
+    
+    scans.reverse()
+    return np.concatenate(scans), np.array(spacings[0])
+
 def load_scan(path):
     
     slices = [pydicom.read_file(path + '/' + s) for s in os.listdir(path)]
@@ -238,12 +267,15 @@ def two_lung_only(bw, spacing, max_iter=22, max_ratio=4.8):
 
     return bw1, bw2, bw
 
-def step1_python(case_path):
+def step1_python(case_path, isEGFR=False):
     if case_path[-4:] == ".mhd":
         case_pixels, spacing = load_mhd(case_path)
     else:
-        case = load_scan(case_path)
-        case_pixels, spacing = get_pixels_hu(case)
+        if isEGFR:
+            case_pixels, spacing = load_egfr(case_path)
+        else:
+            case = load_scan(case_path)
+            case_pixels, spacing = get_pixels_hu(case)
     bw = binarize_per_slice(case_pixels, spacing)
     flag = 0
     cut_num = 0

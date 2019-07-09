@@ -1,7 +1,6 @@
-config = {'datapath':'/home/ysw/ct_data/DSB3/stage2/',
-          'preprocess_result_path':'./prep_result/',
-          'outputfile':'prediction.csv',
-          
+config = {'datapath':'/home/ysw/EGFR/raw_scans/',
+          'preprocess_result_path':'/home/ysw/EGFR/egfr_prep_result/',
+          'outputfile':'prediction.csv', 
           'detector_model':'net_detector',
          'detector_param':'./model/detector.ckpt',
          'classifier_model':'net_classifier',
@@ -9,5 +8,6 @@ config = {'datapath':'/home/ysw/ct_data/DSB3/stage2/',
          'n_gpu':3,
          'n_worker_preprocessing':None,
          'use_exsiting_preprocessing':False,
-         'skip_preprocessing':True,
-         'skip_detect':True}
+         'skip_preprocessing':False,
+         'skip_detect':True,
+         'is_EGFR':True}
