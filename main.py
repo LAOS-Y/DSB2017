@@ -39,7 +39,7 @@ else:
 
 #print(testsplit)
 #print(len(testsplit))
-0/0
+#0/0
 
 print("start building detector")
 

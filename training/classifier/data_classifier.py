@@ -31,10 +31,15 @@ class DataBowl3Classifier(Dataset):
         self.pbb_label = []
         
         idcs = split
+        idcs = [f for f in idcs if os.path.exists(os.path.join(datadir, '%s_clean.npy' % f))]
+        
         self.filenames = [os.path.join(datadir, '%s_clean.npy' % idx) for idx in idcs]
         labels = np.array(pandas.read_csv(config['labelfile']))
+        
+
         if phase !='test':
             self.yset = np.array([labels[labels[:,0]==f.split('-')[0].split('_')[0],1] for f in split]).astype('int')
+
         idcs = [f.split('-')[0] for f in idcs]
         
         
@@ -76,7 +81,7 @@ class DataBowl3Classifier(Dataset):
         else:
             chosenid = conf_list.argsort()[::-1][:topk]
         croplist = np.zeros([topk,1,self.crop_size[0],self.crop_size[1],self.crop_size[2]]).astype('float32')
-        coordlist = np.zeros([topk,3,self.crop_size[0]/self.stride,self.crop_size[1]/self.stride,self.crop_size[2]/self.stride]).astype('float32')
+        coordlist = np.zeros([topk,3,self.crop_size[0]//self.stride,self.crop_size[1]//self.stride,self.crop_size[2]//self.stride]).astype('float32')
         padmask = np.concatenate([np.ones(len(chosenid)),np.zeros(self.topk-len(chosenid))])
         isnodlist = np.zeros([topk])
 
@@ -171,12 +176,13 @@ class simpleCrop():
 
 def sample(conf,N,T=1):
     if len(conf)>N:
-        target = range(len(conf))
+        target = list(range(len(conf)))
         chosen_list = []
         for i in range(N):
             chosenidx = sampleone(target,conf,T)
             chosen_list.append(target[chosenidx])
             target.pop(chosenidx)
+
             conf = np.delete(conf, chosenidx)
 
             

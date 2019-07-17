@@ -8,7 +8,6 @@ from torch.nn import DataParallel
 from torch.backends import cudnn
 from torch.utils.data import DataLoader
 from torch import optim
-from torch.autograd import Variable
 
 from layers import acc
 
@@ -38,9 +37,9 @@ def train_nodulenet(data_loader, net, loss, epoch, optimizer, args):
         if args.debug:
             if i >4:
                 break
-        data = Variable(data.cuda(async = True))
-        target = Variable(target.cuda(async = True))
-        coord = Variable(coord.cuda(async = True))
+        data = data.cuda()
+        target = target.cuda()
+        coord = coord.cuda()
 
         _,output = net(data, coord)
         loss_output = loss(output, target)
@@ -49,7 +48,7 @@ def train_nodulenet(data_loader, net, loss, epoch, optimizer, args):
         #torch.nn.utils.clip_grad_norm(net.parameters(), 1)
         optimizer.step()
 
-        loss_output[0] = loss_output[0].data[0]
+        loss_output[0] = loss_output[0].item()
         metrics.append(loss_output)
 
     end_time = time.time()
@@ -69,7 +68,7 @@ def train_nodulenet(data_loader, net, loss, epoch, optimizer, args):
         np.mean(metrics[:, 3]),
         np.mean(metrics[:, 4]),
         np.mean(metrics[:, 5])))
-    print
+    print()
 
 def validate_nodulenet(data_loader, net, loss):
     start_time = time.time()
@@ -78,15 +77,17 @@ def validate_nodulenet(data_loader, net, loss):
 
     metrics = []
     for i, (data, target, coord) in enumerate(data_loader):
-        data = Variable(data.cuda(async = True), volatile = True)
-        target = Variable(target.cuda(async = True), volatile = True)
-        coord = Variable(coord.cuda(async = True), volatile = True)
+        with torch.no_grad():
+            data = data.cuda()
+            target =target.cuda()
+            coord = coord.cuda()
 
-        _,output = net(data, coord)
-        loss_output = loss(output, target, train = False)
+            _,output = net(data, coord)
+            loss_output = loss(output, target, train = False)
 
-        loss_output[0] = loss_output[0].data[0]
-        metrics.append(loss_output)    
+            loss_output[0] = loss_output[0].item()
+
+            metrics.append(loss_output)    
     end_time = time.time()
 
     metrics = np.asarray(metrics, np.float32)
@@ -103,8 +104,8 @@ def validate_nodulenet(data_loader, net, loss):
         np.mean(metrics[:, 3]),
         np.mean(metrics[:, 4]),
         np.mean(metrics[:, 5])))
-    print
-    print
+    print()
+    print()
 
 def test_nodulenet(data_loader, net, get_pbb, save_dir, config, n_per_run):
     start_time = time.time()
@@ -134,8 +135,8 @@ def test_nodulenet(data_loader, net, get_pbb, save_dir, config, n_per_run):
         featurelist = []
 
         for i in range(len(splitlist)-1):
-            input = Variable(data[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
-            inputcoord = Variable(coord[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
+            input = data[splitlist[i]:splitlist[i+1]].cuda()
+            inputcoord = coord[splitlist[i]:splitlist[i+1]].cuda()
             _,output = net(input,inputcoord)
             outputlist.append(output.data.cpu().numpy())
         output = np.concatenate(outputlist,0)
@@ -153,5 +154,5 @@ def test_nodulenet(data_loader, net, get_pbb, save_dir, config, n_per_run):
 
 
     print('elapsed time is %3.2f seconds' % (end_time - start_time))
-    print
-    print
+    print()
+    print()

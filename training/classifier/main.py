@@ -22,6 +22,10 @@ from data_classifier import DataBowl3Classifier
 
 from utils import *
 
+sys.path.append('../')
+from sync_batchnorm import convert_model
+
+
 parser = argparse.ArgumentParser(description='PyTorch DataBowl3 Detector')
 parser.add_argument('--model1', '-m1', metavar='MODEL', default='base',
                     help='model')
@@ -37,7 +41,7 @@ parser.add_argument('-b', '--batch-size', default=16, type=int,
                     metavar='N', help='mini-batch size (default: 16)')
 parser.add_argument('-b2', '--batch-size2', default=3, type=int,
                     metavar='N', help='mini-batch size (default: 16)')
-parser.add_argument('--lr', '--learning-rate', default=None, type=float,
+parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
@@ -78,6 +82,9 @@ def main():
 
     nodmodel = import_module(args.model1)
     config1, nod_net, loss, get_pbb = nodmodel.get_model()
+
+    nod_net = convert_model(nod_net)
+
     args.lr_stage = config1['lr_stage']
     args.lr_preset = config1['lr']
 
@@ -95,6 +102,8 @@ def main():
     topk = config2['topk']
     case_net = casemodel.CaseNet(topk = topk,nodulenet=nod_net)
 
+    case_net = convert_model(case_net)
+
     args.miss_ratio = config2['miss_ratio']
     args.miss_thresh = config2['miss_thresh']
     if args.debug:
@@ -110,6 +119,10 @@ def main():
     ################################
     start_epoch = args.start_epoch
     if args.resume:
+        #import ipdb
+        #ipdb.set_trace()
+
+
         checkpoint = torch.load(args.resume)
         if start_epoch == 0:
             start_epoch = checkpoint['epoch'] + 1
@@ -182,16 +195,16 @@ def main():
         return
     print(save_dir)
     print(args.save_freq)
-    trainsplit = np.load('kaggleluna_full.npy')
-    valsplit = np.load('valsplit.npy')
-    testsplit = np.load('test.npy')
+    trainsplit = np.load('kaggleluna_full.npy') #valsplit.npy in kaggle_full.npy
+    valsplit = np.load('valsplit.npy') #dsb valsplit.npy in kaggle_full.npy
+    testsplit = np.load('test.npy') #dsb test.npy + kaggle_full.npy == full.npy
 
     dataset = DataBowl3Detector(trainsplit,config1,phase = 'train')
     train_loader_nod = DataLoader(dataset,batch_size = args.batch_size,
         shuffle = True,num_workers = args.workers,pin_memory=True)
 
     dataset = DataBowl3Detector(valsplit,config1,phase = 'val')
-    val_loader_nod = DataLoader(dataset,batch_size = args.batch_size,
+    val_loader_nod = DataLoader(dataset,batch_size = args.batch_size, #
         shuffle = False,num_workers = args.workers,pin_memory=True)
 
     optimizer = torch.optim.SGD(nod_net.parameters(),
@@ -199,15 +212,15 @@ def main():
     
     trainsplit = np.load('full.npy')
     dataset = DataBowl3Classifier(trainsplit,config2,phase = 'train')
-    train_loader_case = DataLoader(dataset,batch_size = args.batch_size2,
+    train_loader_case = DataLoader(dataset,batch_size = args.batch_size2, #dsb full.npy all of dsb stage1
         shuffle = True,num_workers = args.workers,pin_memory=True)
     
     dataset = DataBowl3Classifier(valsplit,config2,phase = 'val')
-    val_loader_case = DataLoader(dataset,batch_size = max([args.batch_size2,1]),
+    val_loader_case = DataLoader(dataset,batch_size = max([args.batch_size2,1]), #dsb val.npy
         shuffle = False,num_workers = args.workers,pin_memory=True)
 
     dataset = DataBowl3Classifier(trainsplit,config2,phase = 'val')
-    all_loader_case = DataLoader(dataset,batch_size = max([args.batch_size2,1]),
+    all_loader_case = DataLoader(dataset,batch_size = max([args.batch_size2,1]), #dsb full.npy all of dsb stage1
         shuffle = False,num_workers = args.workers,pin_memory=True)
 
     optimizer2 = torch.optim.SGD(case_net.parameters(),
@@ -241,6 +254,9 @@ def main():
                 'state_dict': state_dict,
                 'args': args},
                 os.path.join(save_dir, '%03d.ckpt' % epoch))
+
+            torch.save(nod_net, os.path.join(save_dir, 'detector_%03d.ckpt' % epoch))
+            
 if __name__ == '__main__':
     main()
 

@@ -32,7 +32,10 @@ class DataBowl3Detector(Dataset):
         if phase!='test':
             idcs = [f for f in idcs if f not in self.blacklist]
 
+        idcs = [f for f in idcs if os.path.exists(os.path.join(data_dir, '%s_clean.npy' % f))]
+
         self.filenames = [os.path.join(data_dir, '%s_clean.npy' % idx) for idx in idcs]
+
         self.kagglenames = [f for f in self.filenames if len(f.split('/')[-1].split('_')[0])>20]
         self.lunanames = [f for f in self.filenames if len(f.split('/')[-1].split('_')[0])<20]
         
@@ -123,7 +126,7 @@ class DataBowl3Detector(Dataset):
 
     def __len__(self):
         if self.phase == 'train':
-            return len(self.bboxes)/(1-self.r_rand)
+            return int(len(self.bboxes) / (1-self.r_rand))
         elif self.phase =='val':
             return len(self.bboxes)
         else:
@@ -176,7 +179,7 @@ class Crop(object):
         self.crop_size = config['crop_size']
         self.bound_size = config['bound_size']
         self.stride = config['stride']
-	self.pad_value = config['pad_value']
+        self.pad_value = config['pad_value']
 
     def __call__(self, imgs, target, bboxes,isScale=False,isRand=False):
         if isScale:
@@ -205,7 +208,7 @@ class Crop(object):
             if s>e:
                 start.append(np.random.randint(e,s))#!
             else:
-                start.append(int(target[i])-crop_size[i]/2+np.random.randint(-bound_size/2,bound_size/2))
+                start.append(int(target[i])-crop_size[i] // 2+np.random.randint(-bound_size/2,bound_size/2))
                 
                 
         normstart = np.array(start).astype('float32')/np.array(imgs.shape[1:])-0.5
@@ -273,9 +276,16 @@ class LabelMapping(object):
         output_size = []
         for i in range(3):
             assert(input_size[i] % stride == 0)
-            output_size.append(input_size[i] / stride)
+            output_size.append(input_size[i] // stride)
         
-        label = np.zeros(output_size + [len(anchors), 5], np.float32)
+        try:
+            label = np.zeros(output_size + [len(anchors), 5], np.float32)
+        except:
+            print(output_size)
+            print(len(anchors))
+            raise
+
+        
         offset = ((stride.astype('float')) - 1) / 2
         oz = np.arange(offset, offset + stride * (output_size[0] - 1) + 1, stride)
         oh = np.arange(offset, offset + stride * (output_size[1] - 1) + 1, stride)

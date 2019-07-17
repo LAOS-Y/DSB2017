@@ -55,20 +55,31 @@ def train_casenet(epoch,model,data_loader,optimizer,args):
 #         weight = 3*torch.ones(y.size()).float().cuda()
         optimizer.zero_grad()
         nodulePred,casePred,casePred_each = model(x,coord)
-        loss2 = binary_cross_entropy(casePred,y[:,0])
+        
+        #print("CaseNet FP done")
+
+        loss2 = binary_cross_entropy(casePred,y[:,0, 0])
         missMask = (casePred_each<args.miss_thresh).float()
         missLoss = -torch.sum(missMask*isnod*torch.log(casePred_each+0.001))/xsize[0]/xsize[1]
         loss = loss2+args.miss_ratio*missLoss
         loss.backward()
         #torch.nn.utils.clip_grad_norm(model.parameters(), 1)
 
+        #print("CaseNet BP done")
+
         optimizer.step()
-        loss2Hist.append(loss2.data[0])
-        missHist.append(missLoss.data[0])
+
+        #print("CaseNet Optimized")
+
+        loss2Hist.append(loss2.item())
+        missHist.append(missLoss.item())
         lenHist.append(len(x))
         outdata = casePred.data.cpu().numpy()
 
         pred = outdata>0.5
+        
+        ydata = ydata.flatten()
+
         tpn += np.sum(1==pred[ydata==1])
         fpn += np.sum(1==pred[ydata==0])
         fnn += np.sum(0==pred[ydata==1])
@@ -80,7 +91,7 @@ def train_casenet(epoch,model,data_loader,optimizer,args):
     loss2Hist = np.array(loss2Hist)
     lossHist = np.array(lossHist)
     accHist = np.array(accHist)
-    
+
     mean_loss2 = np.sum(loss2Hist*lenHist)/np.sum(lenHist)
     mean_missloss = np.sum(missHist*lenHist)/np.sum(lenHist)
     mean_acc = np.sum(accHist*lenHist)/np.sum(lenHist)
@@ -101,30 +112,32 @@ def val_casenet(epoch,model,data_loader,args):
     fnn = 0
 
     for i,(x,coord,isnod,y) in enumerate(data_loader):
+        with torch.no_grad():
+            coord = coord.cuda()
+            x = x.cuda()
+            xsize = x.size()
+            ydata = y.numpy()[:,0]
+            y = y.float().cuda()
+            isnod = isnod.float().cuda()
 
-        coord = Variable(coord,volatile=True).cuda()
-        x = Variable(x,volatile=True).cuda()
-        xsize = x.size()
-        ydata = y.numpy()[:,0]
-        y = Variable(y).float().cuda()
-        isnod = Variable(isnod).float().cuda()
+            nodulePred,casePred,casePred_each = model(x,coord)
+            
+            loss2 = binary_cross_entropy(casePred,y[:,0, 0])
+            missMask = (casePred_each<args.miss_thresh).float()
+            missLoss = -torch.sum(missMask*isnod*torch.log(casePred_each+0.001))/xsize[0]/xsize[1]
 
-        nodulePred,casePred,casePred_each = model(x,coord)
-        
-        loss2 = binary_cross_entropy(casePred,y[:,0])
-        missMask = (casePred_each<args.miss_thresh).float()
-        missLoss = -torch.sum(missMask*isnod*torch.log(casePred_each+0.001))/xsize[0]/xsize[1]
-
-        #loss2 = binary_cross_entropy(sigmoid(casePred),y[:,0])
-        loss2Hist.append(loss2.data[0])
-        missHist.append(missLoss.data[0])
+            #loss2 = binary_cross_entropy(sigmoid(casePred),y[:,0])
+        loss2Hist.append(loss2.item())
+        missHist.append(missLoss.item())
         lenHist.append(len(x))
         outdata = casePred.data.cpu().numpy()
         #print([i,data_loader.dataset.split[i,1],sigmoid(casePred).data.cpu().numpy()])
         pred = outdata>0.5
-        tpn += np.sum(1==pred[ydata==1])
-        fpn += np.sum(1==pred[ydata==0])
-        fnn += np.sum(0==pred[ydata==1])
+        
+        tpn += np.sum(1==pred[ydata[:, 0]==1])
+        fpn += np.sum(1==pred[ydata[:, 0]==0])
+        fnn += np.sum(0==pred[ydata[:, 0]==1])
+
         acc = np.mean(ydata==pred)
         accHist.append(acc)
     endtime = time.time()

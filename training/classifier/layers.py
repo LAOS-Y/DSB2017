@@ -191,11 +191,11 @@ class Loss(nn.Module):
                 self.regress_loss(ph, lh),
                 self.regress_loss(pw, lw),
                 self.regress_loss(pd, ld)]
-            regress_losses_data = [l.data[0] for l in regress_losses]
+            regress_losses_data = [l.item() for l in regress_losses]
             classify_loss = 0.5 * self.classify_loss(
             pos_prob, pos_labels[:, 0]) + 0.5 * self.classify_loss(
             neg_prob, neg_labels + 1)
-            pos_correct = (pos_prob.data >= 0.5).sum()
+            pos_correct = (pos_prob.data >= 0.5).sum().item()
             pos_total = len(pos_prob)
 
         else:
@@ -205,13 +205,13 @@ class Loss(nn.Module):
             pos_correct = 0
             pos_total = 0
             regress_losses_data = [0,0,0,0]
-        classify_loss_data = classify_loss.data[0]
+        classify_loss_data = classify_loss.item()
 
         loss = classify_loss
         for regress_loss in regress_losses:
             loss += regress_loss
 
-        neg_correct = (neg_prob.data < 0.5).sum()
+        neg_correct = (neg_prob.data < 0.5).sum().item()
         neg_total = len(neg_prob)
 
         return [loss, classify_loss_data] + regress_losses_data + [pos_correct, pos_total, neg_correct, neg_total]
