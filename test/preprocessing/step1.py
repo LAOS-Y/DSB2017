@@ -3,7 +3,7 @@
 """
 import os
 from sample.preprocessing.step1 import load_scan, get_pixels_hu, \
-    binarize_per_slice
+    binarize_per_slice, all_slice_analysis
 from matplotlib import pyplot as plt
 import numpy as np
 
@@ -61,10 +61,36 @@ def binarize_per_slice_test():
     print(type(bw))
 
 
+def all_slice_analysis_test():
+    patients = os.listdir(INPUT_FOLDER)
+    patients.sort()
+    # print("os.path.join(INPUT_FOLDER, patients[25]) =",
+    #       os.path.join(INPUT_FOLDER, patients[25]))
+
+    slices = load_scan(os.path.join(INPUT_FOLDER, patients[25]))
+    case_pixels, spacing = get_pixels_hu(slices)
+    bw = binarize_per_slice(case_pixels, spacing)
+
+    flag = 0
+    cut_num = 0
+    cut_step = 2
+    bw, flag = all_slice_analysis(
+        bw, spacing, cut_num=cut_num,
+        vol_limit=(0.68, 7.5)
+    )
+
+    # bw_backup = np.copy(bw)  # 原始备份
+    # while flag == 0 and cut_num < bw.shape[0]:
+    #     bw = np.copy(bw_backup)
+    #     bw, flag = all_slice_analysis(
+    #         bw, spacing, cut_num=cut_num,
+    #         vol_limit=(0.68, 7.5)
+    #     )
+    #     cut_num = cut_num + cut_step
+
+
 if __name__ == '__main__':
     # load_scan_test()
     # get_pixels_hu_test()
-    binarize_per_slice_test()
-    # X, Y = np.meshgrid([1, 2, 3], [1, 2])
-    # print(X)
-    # print(Y)
+    # binarize_per_slice_test()
+    all_slice_analysis_test()
