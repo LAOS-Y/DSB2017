@@ -228,11 +228,12 @@ def all_slice_analysis(
         spacing,
         cut_num=0,
         vol_limit=(0.68, 8.2),
-        area_th=6e3,  # mm^2
-        dist_th=62,  # mm
+        area_th=6e3,  # mm^2 注意这两个参数用在EGFR是否合适
+        dist_th=62,  # mm 注意这两个参数用在EGFR是否合适
 ):
     """
     分析一个patient的全部slice
+    （已测试 7.22）
 
     :param bw: 二值化后的3D矩阵,shape = (D, H, W)
     :param spacing: patient的(SliceThickness,PixelSpacing[0], PixelSpacing[1])
@@ -241,7 +242,7 @@ def all_slice_analysis(
     :param vol_limit: 体素体积上下限阈值
     :param area_th: 单slice像素面积阈值
     :param dist_th: 连通分量距离volumes中心线的像素距离阈值
-    :return:
+    :return: 经二值化、过滤后的本case矩阵，实际筛选出的连通区域（肺部）数量（若为0则没找到）
     """
     assert isinstance(bw, np.ndarray) and bw.ndim == 3 and bw.dtype == bool
     assert isinstance(spacing, np.ndarray) and len(spacing) == 3
@@ -256,33 +257,28 @@ def all_slice_analysis(
     if cut_num > 0:
         bw_backup_0 = np.copy(bw)
         bw[-cut_num:] = False
-    label = measure.label(bw, connectivity=1)  # 3D
-    # remove components access to corners
-    mid = int(label.shape[2] / 2)
+
+    labels = measure.label(bw, connectivity=1)  # 3D (29个连通区域) 4连通
+
+    # remove components access to corners（仅保留属于人体的圆形内组织）
+    mid = int(labels.shape[2] / 2)  # W轴中点
     bg_label = {
         # 第一张四个角
-        label[0, 0, 0], label[0, 0, -1],
-        label[0, -1, 0], label[0, -1, -1],
-        # 最后一张四个角
-        label[-1 - cut_num, 0, 0], label[-1 - cut_num, 0, -1],
-        label[-1 - cut_num, -1, 0], label[-1 - cut_num, -1, -1],
+        labels[0, 0, 0], labels[0, 0, -1],
+        labels[0, -1, 0], labels[0, -1, -1],
+        # (cut后)最后一张四个角
+        labels[-1 - cut_num, 0, 0], labels[-1 - cut_num, 0, -1],
+        labels[-1 - cut_num, -1, 0], labels[-1 - cut_num, -1, -1],
         # 第一张中部的上下
-        label[0, 0, mid], label[0, -1, mid],
-        # 最后一张中部的上下
-        label[-1 - cut_num, 0, mid],
-        label[-1 - cut_num, -1, mid]
+        labels[0, 0, mid], labels[0, -1, mid],
+        # 最后一张中部的上下（能够去除圆形区域）
+        labels[-1 - cut_num, 0, mid], labels[-1 - cut_num, -1, mid]
     }
     for l in bg_label:
-        label[label == l] = 0
-
-    # 基于体积阈值过滤连通分量
-    properties_1 = measure.regionprops(label, coordinates='xy')
-    for prop_1 in properties_1:
-        if prop_1.area * spacing.prod() < vol_limit[0] * 1e6 \
-                or prop_1.area * spacing.prod() > vol_limit[1] * 1e6:  # 超过体积阈值
-            label[label == prop_1.label] = 0
+        labels[labels == l] = 0
 
     # prepare a distance map for further analysis
+    # 基于体积阈值过滤连通区域 （基本就可以把肺保留下来了）
     # TODO X/Y轴是否弄混了？
     # x_axis = np.linspace(-label.shape[1] / 2 + 0.5,
     #                      label.shape[1] / 2 - 0.5,
@@ -291,64 +287,73 @@ def all_slice_analysis(
     # y_axis = np.linspace(-label.shape[2] / 2 + 0.5,
     #                      label.shape[2] / 2 - 0.5,
     #                      label.shape[2]) * spacing[2]
-    # x, y = np.meshgrid(x_axis, y_axis)
-    x_axis = np.linspace(-label.shape[2] / 2 + 0.5,  # 按自己思路交换坐标轴修改
-                         label.shape[2] / 2 - 0.5,
-                         label.shape[2], dtype=np.float32
-                         ) * spacing[2]
-    y_axis = np.linspace(-label.shape[1] / 2 + 0.5,
-                         label.shape[1] / 2 - 0.5,
-                         label.shape[1], dtype=np.float32
-                         ) * spacing[1]
+    x_axis = np.linspace(-labels.shape[2] / 2 + 0.5,  # 按自己思路交换坐标轴修改
+                         labels.shape[2] / 2 - 0.5,
+                         labels.shape[2], dtype=np.float32) * spacing[2]
+    y_axis = np.linspace(-labels.shape[1] / 2 + 0.5,
+                         labels.shape[1] / 2 - 0.5,
+                         labels.shape[1], dtype=np.float32) * spacing[1]
     x, y = np.meshgrid(x_axis, y_axis)
-    d = (x ** 2 + y ** 2) ** 0.5  # 2D矩阵
-    properties_2 = measure.regionprops(label)
+    d = (x ** 2 + y ** 2) ** 0.5  # 2D矩阵 float32
     valid_label = set()
-    # select components based on their area and distance to center axis on all
-    # slices
-    for prop_2 in properties_2:
-        single_vol = np.array(label == prop_2.label)
-        slice_area = np.zeros(label.shape[0])
-        min_distance = np.zeros(label.shape[0])
-        for i in range(label.shape[0]):  # 遍历每一张slice
-            slice_area[i] = single_vol[i].sum() * spacing[1:3].prod()
-            min_distance[i] = (
-                    single_vol[i] * d + (1 - single_vol[i]) * d.max()
-            ).min()
+    props_1 = measure.regionprops(labels, coordinates='xy')  # 获取连通区域属性
+    for prop_1 in props_1:
+        # 如果超过体积不在阈值范围内，置0抹去（不是所需的连通区域）
+        if prop_1.area * spacing.prod() < vol_limit[0] * 1e6 \
+                or prop_1.area * spacing.prod() > vol_limit[1] * 1e6:
+            labels[labels == prop_1.label] = 0
+        else:  # 是所需的连通区域
+            # select components based on their area and distance to center axis
+            # on all slices
+            single_vol = np.array(labels == prop_1.label)  # (195, 512, 512)bool
 
-        if np.average([min_distance[i] for i in range(label.shape[0])
-                       if slice_area[i] > area_th]) < dist_th:
-            # 若满足要求的slice内，连通区域距离中心线平均距离小于阈值
-            valid_label.add(prop_2.label)
+            slice_area = np.zeros(labels.shape[0])
+            min_distance = np.zeros(labels.shape[0])
 
-    bw = np.isin(label, list(valid_label))  # bool类型 最终处理好的连通区域
+            for i in range(labels.shape[0]):  # 遍历每一张slice
+                slice_area[i] = single_vol[i].sum() * spacing[1:3].prod()
+                min_distance[i] = (
+                        single_vol[i] * d + (1 - single_vol[i]) * d.max()
+                ).min()
+
+            # 过滤掉可能的distracting连通区域
+            if np.average([min_distance[i] for i in range(labels.shape[0])
+                           if slice_area[i] > area_th]) < dist_th:
+                # 若满足要求的slice内，连通区域距离中心线平均距离小于阈值
+                valid_label.add(prop_1.label)
+
+    # (195, 512, 512) bool
+    bw = np.isin(labels, list(valid_label))  # bool类型 最终处理好的连通区域
 
     # fill back the parts removed earlier
-    if cut_num > 0:  # TODO 不太懂这一部分逻辑
-        # bw1 is bw with removed slices, bw2 is a dilated version of bw, part of
-        # their intersection is returned as final mask（有多余计算）
+    if cut_num > 0:
+        # bw_backup_1 is bw with removed slices, bw_backup_2 is a dilated
+        # version of bw, part of their intersection is returned as final mask
         bw_backup_1 = np.copy(bw)
-        # TODO 下一步的意义？？？
         bw_backup_1[-cut_num:] = bw_backup_0[-cut_num:]  # 来自最原始输入
+
         bw_backup_2 = np.copy(bw)
         bw_backup_2 = scipy.ndimage.binary_dilation(  # 膨胀
             bw_backup_2, iterations=cut_num,  # 重复次数？
+            # 如果cut后肺部刚好贴边，则cut_num次膨胀后，依然贴边，但是为什么这么做？
+            # 为了对bw补充完整cut区域，合理～（就是下一行代码）
         )
-        bw3 = bw_backup_1 & bw_backup_2
-        label = measure.label(bw, connectivity=1)
-        label3 = measure.label(bw3, connectivity=1)
-        l_list = list(set(np.unique(label)) - {0})  # bw的连通分量的label
+        bw3 = bw_backup_1 & bw_backup_2  # 这才是最终的bw
+        labels = measure.label(bw, connectivity=1)  # 补cut前的，就2个数字，0、1
+        labels3 = measure.label(bw3, connectivity=1)  # 补cut后的，同2个数字，0、1
+        l_list = list(set(np.unique(labels)) - {0})  # bw的连通分量的label，应该就1
+
         valid_l3 = set()
         for l in l_list:
-            indices = np.nonzero(label == l)
-            l3 = label3[
+            indices = np.nonzero(labels == l)  # 选取肺部对应的index
+            l3 = labels3[
                 indices[0][0],
                 indices[1][0],
                 indices[2][0]
             ]
-            if l3 > 0:
+            if l3 > 0:  # 在label3中也是器官，这应该是必然的吧？
                 valid_l3.add(l3)
-        bw = np.isin(label3, list(valid_l3))
+        bw = np.isin(labels3, list(valid_l3))
 
     return bw, len(valid_label)
 
@@ -362,7 +367,7 @@ def fill_hole(bw):
         label[-1, 0, 0], label[-1, 0, -1], label[-1, -1, 0],
         label[-1, -1, -1]
     }
-    bw = ~np.in1d(label, list(bg_label)).reshape(label.shape)
+    bw = ~np.isin(label, list(bg_label))
 
     return bw
 
@@ -447,14 +452,22 @@ def two_lung_only(bw, spacing, max_iter=22, max_ratio=4.8):
     return bw1, bw2, bw
 
 
-def step1_python(case_path, isEGFR=False):
+def step1_python(case_path, is_egfr=False):
+    """
+
+
+    :param case_path: （DSB中）一个病人的CT文件全路径
+    :param is_egfr: 是否是EGFR数据
+    :return:
+    """
     assert isinstance(case_path, str)
-    assert isinstance(isEGFR, bool)
+    assert isinstance(is_egfr, bool)
+    assert os.path.isdir(case_path)
 
     if case_path[-4:] == ".mhd":  # TODO 干嘛用的？
         case_pixels, spacing = load_mhd(case_path)
     else:
-        if isEGFR:
+        if is_egfr:
             case_pixels, spacing = load_egfr(case_path)
         else:
             case = load_scan(case_path)  # 读取一个病人的全部slide
@@ -462,21 +475,23 @@ def step1_python(case_path, isEGFR=False):
 
     bw = binarize_per_slice(case_pixels, spacing)  # 二值化
 
-    flag = 0  # TODO 什么意义？
+    flag = 0  # 意义：找到了几个疑似肺的连通区域
     cut_num = 0
     cut_step = 2
     bw_backup = np.copy(bw)  # 原始备份
-    while flag == 0 and cut_num < bw.shape[0]:
+    while flag == 0 and cut_num < bw.shape[0]:  # 没找到，就去掉顶层的2片slice
+        print("进入while")
         bw = np.copy(bw_backup)
         bw, flag = all_slice_analysis(
             bw, spacing, cut_num=cut_num,
             vol_limit=(0.68, 7.5)
         )
+        print('flag =', flag)
         cut_num = cut_num + cut_step
 
-    # bw = fill_hole(bw)
-    # bw1, bw2, bw = two_lung_only(bw, spacing)
-    # return case_pixels, bw1, bw2, spacing
+    bw = fill_hole(bw)
+    bw1, bw2, bw = two_lung_only(bw, spacing)
+    return case_pixels, bw1, bw2, spacing
 
 
 if __name__ == '__main__':
@@ -485,11 +500,13 @@ if __name__ == '__main__':
     patients.sort()
 
     case_pixels, m1, m2, spacing = step1_python(
-        os.path.join(INPUT_FOLDER, patients[25])
+        os.path.join(INPUT_FOLDER, patients[0])
     )
-    # plt.imshow(m1[60])
-    # plt.figure()
-    # plt.imshow(m2[60])
+    # plt.imshow(m1[60], 'gray')
+    # plt.show()
+
+    plt.imshow(m2[60], 'gray')
+    plt.show()
 
 #     first_patient = load_scan(INPUT_FOLDER + patients[25])
 #     first_patient_pixels, spacing = get_pixels_hu(first_patient)

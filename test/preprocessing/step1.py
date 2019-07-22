@@ -72,21 +72,14 @@ def all_slice_analysis_test():
     bw = binarize_per_slice(case_pixels, spacing)
 
     flag = 0
-    cut_num = 0
+    cut_num = 2
     cut_step = 2
     bw, flag = all_slice_analysis(
         bw, spacing, cut_num=cut_num,
         vol_limit=(0.68, 7.5)
     )
-
-    # bw_backup = np.copy(bw)  # 原始备份
-    # while flag == 0 and cut_num < bw.shape[0]:
-    #     bw = np.copy(bw_backup)
-    #     bw, flag = all_slice_analysis(
-    #         bw, spacing, cut_num=cut_num,
-    #         vol_limit=(0.68, 7.5)
-    #     )
-    #     cut_num = cut_num + cut_step
+    print(bw.shape, bw.dtype)
+    print(flag)
 
 
 if __name__ == '__main__':
