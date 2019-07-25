@@ -254,6 +254,7 @@ def all_slice_analysis(
     assert isinstance(dist_th, (int, float)) and dist_th > 0
 
     # in some cases, several top layers need to be removed first
+    bw_backup_0 = None  # 为了消除IDE的错误检查预告
     if cut_num > 0:
         bw_backup_0 = np.copy(bw)
         bw[-cut_num:] = False
@@ -359,91 +360,147 @@ def all_slice_analysis(
 
 
 def fill_hole(bw):
-    # fill 3d holes
-    label = measure.label(~bw)
-    # idendify corner components
-    bg_label = {
-        label[0, 0, 0], label[0, 0, -1], label[0, -1, 0], label[0, -1, -1],
-        label[-1, 0, 0], label[-1, 0, -1], label[-1, -1, 0],
-        label[-1, -1, -1]
-    }
-    bw = ~np.isin(label, list(bg_label))
+    """
+    填充3D矩阵的空洞（去除3D矩阵8个角落可能的噪音）
 
+    :param bw: 经筛选后的二值化肺部区域
+    :return: 处理后的3D布尔矩阵
+    """
+    assert isinstance(bw, np.ndarray) and bw.dtype == bool and bw.ndim == 3
+
+    labels = measure.label(~bw)  # 筛选非肺部空间
+
+    # idendify corner components
+    bg_label = {  # 8个角
+        labels[0, 0, 0], labels[0, 0, -1],
+        labels[0, -1, 0], labels[0, -1, -1],
+        labels[-1, 0, 0], labels[-1, 0, -1],
+        labels[-1, -1, 0], labels[-1, -1, -1]
+    }
+
+    # 为了过滤掉8个角落存在的可能的噪音（可能和数据集相关）
+    bw = ~np.isin(labels, list(bg_label))
     return bw
 
 
 def two_lung_only(bw, spacing, max_iter=22, max_ratio=4.8):
-    def extract_main(bw, cover=0.95):
-        for i in range(bw.shape[0]):
-            current_slice = bw[i]
-            label = measure.label(current_slice)
-            properties = measure.regionprops(label)
-            properties.sort(key=lambda x: x.area, reverse=True)
-            area = [prop.area for prop in properties]
-            count = 0
-            sum = 0
-            while sum < np.sum(area) * cover:
-                sum = sum + area[count]
-                count = count + 1
-            filter = np.zeros(current_slice.shape, dtype=bool)
-            for j in range(count):
-                bb = properties[j].bbox
-                filter[bb[0]:bb[2], bb[1]:bb[3]] = filter[bb[0]:bb[2],
-                                                   bb[1]:bb[3]] | properties[
-                                                       j].convex_image
-            bw[i] = bw[i] & filter
+    """
+    返回分别包含左右肺的2个3D矩阵，和同时包含2个肺的3D矩阵
 
-        label = measure.label(bw)
-        properties = measure.regionprops(label)
-        properties.sort(key=lambda x: x.area, reverse=True)
-        bw = label == properties[0].label
+    :param bw: bool类型3D矩阵
+    :param spacing: spacing参数
+    :param max_iter: 最大迭代次数
+    :param max_ratio: ？？？
+    :return: ？？？？
+    """
+    assert isinstance(bw, np.ndarray) and bw.ndim == 3 and bw.dtype == np.bool
+    assert isinstance(spacing, np.ndarray) and len(spacing) == 3
+    assert isinstance(max_iter, int) and max_iter > 0
+    assert isinstance(max_ratio, float) and max_ratio > 0.
 
-        return bw
+    def extract_main(bw_, cover=0.95):
+        """
+        仅保留肺部mask
+        （基本看懂）
 
-    def fill_2d_hole(bw):
-        for i in range(bw.shape[0]):
-            current_slice = bw[i]
-            label = measure.label(current_slice)
-            properties = measure.regionprops(label)
-            for prop in properties:
-                bb = prop.bbox
-                current_slice[bb[0]:bb[2], bb[1]:bb[3]] = current_slice[
-                                                          bb[0]:bb[2], bb[1]:bb[
-                    3]] | prop.filled_image
-            bw[i] = current_slice
+        :param bw_: 单肺3D布尔矩阵
+        :param cover: 主要连通区域占slice的比例
+        :return: 处理后仅含肺部的mask
+        """
+        for i in range(bw_.shape[0]):  # 遍历每一个slice
+            current_slice_ = bw_[i]  # 2D
+            labels_ = measure.label(current_slice_)  # 应该就0、1
+            props_ = measure.regionprops(labels_)
+            props_.sort(key=lambda x: x.area, reverse=True)  # 大到小（背景、肺）
+            area_ = [prop_.area for prop_ in props_]
+            count_ = 0
+            sum_ = 0
 
-        return bw
+            while sum_ < np.sum(area_) * cover:  # np.sum(area)不就是slice面积么？
+                sum_ += area_[count_]
+                count_ = count_ + 1
+
+            filter_ = np.zeros(current_slice_.shape, dtype=bool)
+            for j in range(count_):  # 仅0
+                bb = props_[j].bbox  # 背景bbox
+                # bbox: (min_row, min_col, max_row, max_col)
+                filter_[bb[0]:bb[2], bb[1]:bb[3]] = \
+                    filter_[bb[0]:bb[2], bb[1]:bb[3]] | props_[
+                        j].convex_image  # 并集 （和边界外接框同大小的凸包）
+            bw_[i] = bw_[i] & filter_  # 交集 为了什么？
+
+        labels_ = measure.label(bw_)
+        props_ = measure.regionprops(labels_)
+        props_.sort(key=lambda x: x.area, reverse=True)
+        bw_ = labels_ == props_[0].label  # 感觉有很多操作多此一举？
+
+        return bw_
+
+    def fill_2d_hole(bw_):
+        """
+        填补肺内小洞？
+
+        :param bw_: 全肺3D布尔矩阵
+        :return:
+        """
+        for i in range(bw_.shape[0]):
+            current_slice_ = bw_[i]
+            label_ = measure.label(current_slice_)
+            props_ = measure.regionprops(label_)
+            for prop_ in props_:  # 应该有3或2个连通区域的属性
+                bb_ = prop_.bbox
+                current_slice_[bb_[0]:bb_[2], bb_[1]:bb_[3]] = \
+                    current_slice_[
+                    bb_[0]:bb_[2],
+                    bb_[1]:bb_[3]
+                    ] | prop_.filled_image
+                # filled_image: Binary region image with filled holes which has
+                # the same size as bounding box.
+            bw_[i] = current_slice_
+
+        return bw_
 
     found_flag = False
     iter_count = 0
-    bw0 = np.copy(bw)
+    bw_backup_0 = np.copy(bw)
+
     while not found_flag and iter_count < max_iter:
-        label = measure.label(bw, connectivity=2)
-        properties = measure.regionprops(label)
-        properties.sort(key=lambda x: x.area, reverse=True)
-        if len(properties) > 1 and properties[0].area / properties[
-            1].area < max_ratio:
+        labels = measure.label(
+            bw, connectivity=2  # 8连通
+        )
+        props = measure.regionprops(labels)
+        props.sort(key=lambda x: x.area, reverse=True)  # 按递减排列连通区域
+
+        # 如果找到了左右两个分开的肺
+        if len(props) > 1 and props[0].area / props[1].area < max_ratio:
             found_flag = True
-            bw1 = label == properties[0].label
-            bw2 = label == properties[1].label
-        else:
-            bw = scipy.ndimage.binary_erosion(bw)
+            bw1 = np.array(labels == props[0].label, dtype=np.bool)  # 更大的肺
+            bw2 = np.array(labels == props[1].label, dtype=np.bool)  # 略小的肺
+        else:  # 否则侵蚀
+            bw = scipy.ndimage.binary_erosion(bw)  # 一次侵蚀一个像素厚度
             iter_count = iter_count + 1
 
-    if found_flag:
-        d1 = scipy.ndimage.morphology.distance_transform_edt(bw1 == False,
-                                                             sampling=spacing)
-        d2 = scipy.ndimage.morphology.distance_transform_edt(bw2 == False,
-                                                             sampling=spacing)
-        bw1 = bw0 & (d1 < d2)
-        bw2 = bw0 & (d1 > d2)
+    if found_flag:  # 找到了两个肺独立的左右肺部
+        # 距离1号肺部的距离矩阵
+        d1 = scipy.ndimage.morphology.distance_transform_edt(
+            np.array(bw1 == False, dtype=np.bool),
+            sampling=spacing,
+        )
+        # 距离2号肺部的距离矩阵
+        d2 = scipy.ndimage.morphology.distance_transform_edt(
+            np.array(bw2 == False, dtype=np.bool),
+            sampling=spacing,
+        )
+
+        bw1 = bw_backup_0 & (d1 < d2)  # 过滤出1号肺
+        bw2 = bw_backup_0 & (d1 > d2)  # 过滤出2号肺
 
         bw1 = extract_main(bw1)
         bw2 = extract_main(bw2)
 
-    else:
-        bw1 = bw0
-        bw2 = np.zeros(bw.shape).astype('bool')
+    else:  # 没找到两个肺
+        bw1 = bw_backup_0
+        bw2 = np.zeros(bw.shape, dtype=np.bool)
 
     bw1 = fill_2d_hole(bw1)
     bw2 = fill_2d_hole(bw2)
@@ -480,16 +537,14 @@ def step1_python(case_path, is_egfr=False):
     cut_step = 2
     bw_backup = np.copy(bw)  # 原始备份
     while flag == 0 and cut_num < bw.shape[0]:  # 没找到，就去掉顶层的2片slice
-        print("进入while")
         bw = np.copy(bw_backup)
         bw, flag = all_slice_analysis(
             bw, spacing, cut_num=cut_num,
             vol_limit=(0.68, 7.5)
         )
-        print('flag =', flag)
         cut_num = cut_num + cut_step
 
-    bw = fill_hole(bw)
+    bw = fill_hole(bw)  # 去除8个角落的可能噪音
     bw1, bw2, bw = two_lung_only(bw, spacing)
     return case_pixels, bw1, bw2, spacing
 

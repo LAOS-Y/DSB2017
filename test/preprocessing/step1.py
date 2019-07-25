@@ -3,9 +3,10 @@
 """
 import os
 from sample.preprocessing.step1 import load_scan, get_pixels_hu, \
-    binarize_per_slice, all_slice_analysis
+    binarize_per_slice, all_slice_analysis, fill_hole
 from matplotlib import pyplot as plt
 import numpy as np
+from scipy import ndimage
 
 INPUT_FOLDER = os.path.expanduser('~/DSB3/stage1/')
 
@@ -82,8 +83,38 @@ def all_slice_analysis_test():
     print(flag)
 
 
+def fill_hole_test():
+    bw = np.zeros((3, 3, 3), dtype=np.bool)
+    bw[1, 1, 1] = True
+    bw = fill_hole(bw)
+    print(bw)
+
+
 if __name__ == '__main__':
     # load_scan_test()
     # get_pixels_hu_test()
     # binarize_per_slice_test()
-    all_slice_analysis_test()
+    # all_slice_analysis_test()
+    # fill_hole_test()
+    np.set_printoptions(precision=3)
+    a = np.array([
+        [1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1],
+        [1, 0, 0, 1, 1, 1],
+        [1, 0, 0, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1],
+    ], dtype=np.bool)
+    b = np.array([
+        [1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 0, 0, 1],
+        [1, 1, 1, 0, 0, 1],
+        [1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1],
+    ], dtype=np.bool)
+    print(a)
+    print(b)
+    print(a | b)
+    print(a & b)
+    pass
